@@ -21,15 +21,14 @@ public class AiServiceTests
     [Fact]
     public async Task GetPersonalizedRecommendationsAsync_ShouldReturnOnboarding_WhenUserHasNoAssessments()
     {
-        // Arrange
         using var dbContext = CreateInMemoryDbContext();
         var service = new AiService(dbContext);
         var userId = Guid.NewGuid(); // usuário sem dados
 
-        // Act
+        
         var recommendations = await service.GetPersonalizedRecommendationsAsync(userId);
 
-        // Assert
+        
         Assert.NotEmpty(recommendations);
         Assert.Contains(recommendations, r => r.Category == "onboarding");
     }
@@ -37,12 +36,10 @@ public class AiServiceTests
     [Fact]
     public async Task GetPersonalizedRecommendationsAsync_ShouldIncludeStressManagement_WhenAverageStressIsHigh()
     {
-        // Arrange
         using var dbContext = CreateInMemoryDbContext();
         var service = new AiService(dbContext);
         var userId = Guid.NewGuid();
 
-        // cria algumas autoavaliações com estresse alto
         var assessments = new List<SelfAssessment>
         {
             new()
@@ -70,10 +67,8 @@ public class AiServiceTests
         await dbContext.SelfAssessments.AddRangeAsync(assessments);
         await dbContext.SaveChangesAsync();
 
-        // Act
         var recommendations = await service.GetPersonalizedRecommendationsAsync(userId);
 
-        // Assert
         Assert.NotEmpty(recommendations);
         Assert.Contains(recommendations, r => r.Category == "stress_management");
     }
@@ -81,16 +76,13 @@ public class AiServiceTests
     [Fact]
     public async Task GetMonthlyReportAsync_ShouldReturnNoDataSummary_WhenThereAreNoAssessments()
     {
-        // Arrange
         using var dbContext = CreateInMemoryDbContext();
         var service = new AiService(dbContext);
         var year = 2025;
         var month = 3;
 
-        // Act
         var report = await service.GetMonthlyReportAsync(year, month);
 
-        // Assert
         Assert.Equal(year, report.Year);
         Assert.Equal(month, report.Month);
         Assert.Equal(0, report.AverageMood);

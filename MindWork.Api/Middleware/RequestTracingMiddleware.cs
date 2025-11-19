@@ -24,7 +24,6 @@ public class RequestTracingMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // Tenta obter CorrelationId existente, senão gera um novo
         if (!context.Request.Headers.TryGetValue(CorrelationIdHeader, out var correlationId) ||
             string.IsNullOrWhiteSpace(correlationId))
         {
@@ -32,7 +31,6 @@ public class RequestTracingMiddleware
             context.Request.Headers[CorrelationIdHeader] = correlationId;
         }
 
-        // Também devolve no response para facilitar acompanhamento em clientes
         context.Response.Headers[CorrelationIdHeader] = correlationId!;
 
         var stopwatch = Stopwatch.StartNew();

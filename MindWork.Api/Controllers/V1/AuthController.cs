@@ -1,17 +1,23 @@
-using BCrypt.Net;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using MindWork.Api.Domain.Entities;
 using MindWork.Api.Domain.Enums;
 using MindWork.Api.Infrastructure.Authentication;
 using MindWork.Api.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 
 namespace MindWork.Api.Controllers.V1;
 
+/// <summary>
+/// Endpoints de autenticação e gestão de credenciais da MindWork.
+/// Permite registro de novos usuários (colaboradores/gestores) e login via JWT.
+/// </summary>
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/[controller]")]
+[AllowAnonymous]
 public class AuthController : ControllerBase
 {
     private readonly MindWorkDbContext _dbContext;
@@ -24,23 +30,50 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Registro de novo usuário (colaborador ou gestor).
-    /// Usado pelo app Mobile para cadastro.
+    /// Registra um novo usuário (colaborador ou gestor) na plataforma MindWork.
     /// </summary>
+    /// <remarks>
+    /// Exemplo de requisição:
+    ///
+    ///     POST /api/v1/auth/register
+    ///     {
+    ///       "fullName": "João da Silva",
+    ///       "email": "joao.silva@empresa.com",
+    ///       "password": "SenhaForte@123",
+    ///       "role": "Collaborator"
+    ///     }
+    ///
+    /// Roles válidos:
+    /// - Collaborator
+    /// - Manager
+    ///
+    /// </remarks>
+    /// <param name="request">Dados do usuário a ser cadastrado.</param>
+    /// <response code="201">Usuário criado com sucesso.</response>
+    /// <response code="400">Dados inválidos.</response>
+    /// <response code="409">Já existe um usuário com este e-mail.</response>
     [HttpPost("register")]
-    [AllowAnonymous]
-    public async Task<ActionResult<AuthResponse>> Register(RegisterRequest request)
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
-        // validações básicas
-        if (!Enum.TryParse<UserRole>(request.Role, true, out var role))
+        if (!ModelState.IsValid)
         {
-            return BadRequest("Role inválida. Use 'Collaborator' ou 'Manager'.");
+            return BadRequest(ModelState);
         }
 
-        var existingUser = _dbContext.Users.FirstOrDefault(u => u.Email == request.Email);
-        if (existingUser != null)
+        var emailExists = await _dbContext.Users
+            .AnyAsync(u => u.Email == request.Email);
+
+        if (emailExists)
         {
-            return Conflict("Já existe um usuário cadastrado com esse e-mail.");
+            return Conflict(new { message = "Já existe um usuário cadastrado com este e-mail." });
+        }
+
+        if (!Enum.TryParse<UserRole>(request.Role, true, out var role))
+        {
+            return BadRequest(new { message = "Role inválida. Use 'Collaborator' ou 'Manager'." });
         }
 
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
@@ -52,74 +85,127 @@ public class AuthController : ControllerBase
             Email = request.Email,
             PasswordHash = passwordHash,
             Role = role,
-            CreatedAt = DateTime.UtcNow,
-            IsActive = true
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
         };
 
-        await _dbContext.Users.AddAsync(user);
+        _dbContext.Users.Add(user);
         await _dbContext.SaveChangesAsync();
 
-        var token = _jwtTokenGenerator.GenerateToken(user);
-
-        var response = new AuthResponse(
-            Token: token,
+        var response = new RegisterResponse(
+            Id: user.Id,
             FullName: user.FullName,
-            Role: user.Role.ToString());
+            Email: user.Email,
+            Role: user.Role.ToString(),
+            CreatedAt: user.CreatedAt
+        );
 
-        return Ok(response);
+        return CreatedAtAction(nameof(Register), new { id = user.Id }, response);
     }
 
     /// <summary>
-    /// Login com e-mail e senha.
-    /// Retorna um JWT para acesso às rotas protegidas.
+    /// Realiza login na plataforma e retorna um token JWT.
     /// </summary>
+    /// <remarks>
+    /// Exemplo de requisição:
+    ///
+    ///     POST /api/v1/auth/login
+    ///     {
+    ///       "email": "joao.silva@empresa.com",
+    ///       "password": "SenhaForte@123"
+    ///     }
+    ///
+    /// Exemplo de resposta:
+    ///
+    ///     {
+    ///       "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    ///       "fullName": "João da Silva",
+    ///       "role": "Collaborator"
+    ///     }
+    ///
+    /// O token deve ser enviado em chamadas autenticadas via:
+    ///
+    ///     Authorization: Bearer {token}
+    ///
+    /// </remarks>
+    /// <param name="request">Credenciais de login.</param>
+    /// <response code="200">Login bem-sucedido, JWT retornado.</response>
+    /// <response code="400">Dados inválidos.</response>
+    /// <response code="401">Credenciais incorretas ou usuário inativo.</response>
     [HttpPost("login")]
-    [AllowAnonymous]
-    public async Task<ActionResult<AuthResponse>> Login(LoginRequest request)
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request)
     {
-        var user = await _dbContext.Users
-            .Where(u => u.Email == request.Email && u.IsActive)
-            .FirstOrDefaultAsync();
-
-        if (user == null)
+        if (!ModelState.IsValid)
         {
-            return Unauthorized("Credenciais inválidas.");
+            return BadRequest(ModelState);
         }
 
-        var passwordOk = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
-        if (!passwordOk)
+        var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+
+        if (user is null)
         {
-            return Unauthorized("Credenciais inválidas.");
+            return Unauthorized(new { message = "Credenciais inválidas." });
+        }
+
+        if (!user.IsActive)
+        {
+            return Unauthorized(new { message = "Usuário inativo. Entre em contato com o gestor." });
+        }
+
+        var passwordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+        if (!passwordValid)
+        {
+            return Unauthorized(new { message = "Credenciais inválidas." });
         }
 
         var token = _jwtTokenGenerator.GenerateToken(user);
 
-        var response = new AuthResponse(
+        var response = new LoginResponse(
             Token: token,
             FullName: user.FullName,
-            Role: user.Role.ToString());
+            Role: user.Role.ToString()
+        );
 
         return Ok(response);
     }
 }
 
-// ----------------------------
-// DTOs usados no AuthController
-// ----------------------------
-
+/// <summary>
+/// Dados de entrada para registro de um novo usuário.
+/// </summary>
 public record RegisterRequest(
     string FullName,
     string Email,
     string Password,
-    string Role // "Collaborator" ou "Manager"
+    string Role
 );
 
+/// <summary>
+/// Resposta ao registrar um novo usuário.
+/// </summary>
+public record RegisterResponse(
+    Guid Id,
+    string FullName,
+    string Email,
+    string Role,
+    DateTime CreatedAt
+);
+
+/// <summary>
+/// Dados de entrada para login.
+/// </summary>
 public record LoginRequest(
     string Email,
     string Password
 );
 
-public record AuthResponse(
+/// <summary>
+/// Resposta de login contendo o token JWT e informações básicas do usuário.
+/// </summary>
+public record LoginResponse(
     string Token,
     string FullName,
     string Role

@@ -12,7 +12,6 @@ public class DesignTimeMindWorkDbContextFactory : IDesignTimeDbContextFactory<Mi
 {
   public MindWorkDbContext CreateDbContext(string[] args)
   {
-    // Lê o appsettings.json para pegar a connection string
     var configuration = new ConfigurationBuilder()
       .SetBasePath(Directory.GetCurrentDirectory())
       .AddJsonFile("appsettings.json", optional: false)

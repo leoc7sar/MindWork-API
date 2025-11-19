@@ -11,7 +11,6 @@ public class SelfAssessment
   /// </summary>
   public Guid UserId { get; set; }
 
-  // Navegação para EF Core (um usuário -> várias avaliações)
   public User? User { get; set; }
 
   /// <summary>

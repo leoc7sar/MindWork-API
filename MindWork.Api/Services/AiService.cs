@@ -40,7 +40,6 @@ public class AiService : IAiService
 
     public async Task<List<AiRecommendation>> GetPersonalizedRecommendationsAsync(Guid userId)
     {
-        // Pega as últimas 4 semanas de autoavaliações do usuário
         var sinceDate = DateTime.UtcNow.Date.AddDays(-28);
 
         var assessments = await _dbContext.SelfAssessments
@@ -64,9 +63,7 @@ public class AiService : IAiService
         var averageMood = assessments.Average(a => (int)a.Mood);
         var averageStress = assessments.Average(a => (int)a.Stress);
         var averageWorkload = assessments.Average(a => (int)a.Workload);
-
-        // Regras simples — pontos de partida para depois trocar por IA mais sofisticada
-
+        
         if (averageStress >= (int)StressLevel.High)
         {
             recommendations.Add(new AiRecommendation(
@@ -91,7 +88,6 @@ public class AiService : IAiService
                 Category: "emotional_health"));
         }
 
-        // Se tudo está razoavelmente equilibrado:
         if (!recommendations.Any())
         {
             recommendations.Add(new AiRecommendation(
@@ -140,12 +136,10 @@ public class AiService : IAiService
         var findings = new List<string>();
         var actions = new List<string>();
 
-        // Achados
         findings.Add($"Média de humor no período: {averageMood:0.0} (escala 1–5).");
         findings.Add($"Média de estresse no período: {averageStress:0.0} (escala 1–5).");
         findings.Add($"Média de carga de trabalho no período: {averageWorkload:0.0} (escala 1–5).");
 
-        // Recomendações de alto nível para gestores
         if (averageStress >= (int)StressLevel.High)
         {
             actions.Add("Rever metas e prazos junto à equipe, priorizando tarefas críticas.");
@@ -187,14 +181,12 @@ public class AiService : IAiService
     }
 }
 
-// ----------------------------
-// Modelos de retorno da IA
-// ----------------------------
+
 
 public record AiRecommendation(
     string Title,
     string Description,
-    string Category // ex.: "stress_management", "workload", "emotional_health", "maintenance"
+    string Category 
 );
 
 public record MonthlyReportResult(

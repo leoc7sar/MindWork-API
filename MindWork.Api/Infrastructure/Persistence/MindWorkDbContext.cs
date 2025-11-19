@@ -17,10 +17,7 @@ public class MindWorkDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-
-        // ---------------------------
-        // Configuração da tabela Users
-        // ---------------------------
+      
         modelBuilder.Entity<User>(entity =>
         {
             entity.ToTable("Users");
@@ -51,10 +48,7 @@ public class MindWorkDbContext : DbContext
             entity.Property(u => u.IsActive)
                 .HasDefaultValue(true);
         });
-
-        // ---------------------------
-        // Configuração da tabela SelfAssessments
-        // ---------------------------
+      
         modelBuilder.Entity<SelfAssessment>(entity =>
         {
             entity.ToTable("SelfAssessments");
@@ -69,14 +63,11 @@ public class MindWorkDbContext : DbContext
 
             entity
                 .HasOne(sa => sa.User)
-                .WithMany() // se quiser, depois dá pra adicionar ICollection<SelfAssessment> em User
+                .WithMany()
                 .HasForeignKey(sa => sa.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
-
-        // ---------------------------
-        // Configuração da tabela WellnessEvents
-        // ---------------------------
+      
         modelBuilder.Entity<WellnessEvent>(entity =>
         {
             entity.ToTable("WellnessEvents");
@@ -97,7 +88,6 @@ public class MindWorkDbContext : DbContext
             entity.Property(we => we.MetadataJson)
                 .HasColumnType("nvarchar(max)");
 
-            // relação opcional com User
             entity
                 .HasOne<User>()
                 .WithMany()
