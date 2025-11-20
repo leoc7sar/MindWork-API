@@ -8,7 +8,7 @@ A MindWork é consumida por:
 - Módulo de IoT / IA
 - Ferramentas de observabilidade e monitoramento (health checks, logs, tracing)
 
----
+----
 
 ## Contexto da Global Solution
 
