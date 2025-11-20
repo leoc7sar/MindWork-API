@@ -10,6 +10,14 @@ A MindWork é consumida por:
 
 ----
 
+##  Links Importantes
+
+*  **Vídeo de Demonstração : https://youtu.be/zjrxhkeTkMg**
+*  **Repositório da matéria IOT: https://github.com/tcguus/MindWork-IOT**
+*  **Repositório da matéria de Mobile (.NET): https://github.com/tcguus/MindWork-Mobile**
+
+---
+
 ## Contexto da Global Solution
 
 **Tema:** O Futuro do Trabalho  
